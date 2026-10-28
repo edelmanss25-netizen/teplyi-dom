@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  NAV, PLATFORMS, OFFERS, PODCAST, TEACHER, CONTEXT, SITES, FACTS_TD, AUDIT, FUNNEL, SEO, CALC,
+  NAV, PLATFORMS, OFFERS, PODCAST, TEACHER, CONTEXT, SITES, FACTS_TD, AUDIT, FUNNEL, SEO, CALC, BRIEF,
 } from './data/content.js'
 
 const rub = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' ₽'
@@ -46,6 +46,46 @@ const List = ({ items }) => (
 )
 const Stat = ({ value, label }) => (<div className="stat"><b>{value}</b><span>{label}</span></div>)
 const SubTitle = ({ children }) => <h3 className="subtitle reveal">{children}</h3>
+
+function TrimList({ items, max = 4 }) {
+  const [all, setAll] = useState(false)
+  const shown = all ? items : items.slice(0, max)
+  return (
+    <>
+      <List items={shown} />
+      {items.length > max && (
+        <button className="more-link" onClick={() => setAll(!all)}>
+          {all ? 'Свернуть' : `Показать все (${items.length}) ↓`}
+        </button>
+      )}
+    </>
+  )
+}
+
+function More({ label, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={`more ${open ? 'open' : ''}`}>
+      <button className="more-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span>{open ? 'Свернуть' : label}</span><i>{open ? '−' : '+'}</i>
+      </button>
+      <div className="more-body">{children}</div>
+    </div>
+  )
+}
+
+const recSel = () => Object.fromEntries(CALC.map((g) => [g.id, g.options.findIndex((o) => o.rec)]))
+function totals(sel) {
+  let once = 0, month = 0, extra = 0
+  const rows = []
+  CALC.forEach((g) => {
+    const o = g.options[sel[g.id]]
+    if (!o) return
+    once += o.once || 0; month += o.month || 0; extra += o.extra || 0
+    rows.push({ g: g.title, label: o.label, cost: o.once ? rub(o.once) : `${rub(o.month)}/мес` })
+  })
+  return { once, month, extra, rows, total3: once + 3 * (month + extra) }
+}
 
 const SectionHead = ({ n, stage, kicker, title, lead, dark }) => (
   <header className={`sec-head reveal ${dark ? 'on-dark' : ''}`}>
@@ -181,27 +221,14 @@ function Lightbox({ src, onClose }) {
 }
 
 /* ------------------------------------------------------- calculator */
-const recommended = () => Object.fromEntries(CALC.map((g) => [g.id, g.options.findIndex((o) => o.rec)]))
+const recommended = recSel
 const empty = () => Object.fromEntries(CALC.map((g) => [g.id, -1]))
 
 function Calculator() {
   const [sel, setSel] = useState(recommended)
   const [margin, setMargin] = useState(300000)
 
-  const calc = useMemo(() => {
-    let once = 0, month = 0, extra = 0
-    const rows = []
-    CALC.forEach((g) => {
-      const o = g.options[sel[g.id]]
-      if (!o) return
-      once += o.once || 0
-      month += o.month || 0
-      extra += o.extra || 0
-      rows.push({ g: g.title, label: o.label, cost: o.once ? rub(o.once) : `${rub(o.month)}/мес` })
-    })
-    const total3 = once + 3 * (month + extra)
-    return { once, month, extra, rows, total3 }
-  }, [sel])
+  const calc = useMemo(() => totals(sel), [sel])
 
   const m = Math.max(0, Number(margin) || 0)
   const houses = m > 0 ? Math.ceil(calc.total3 / m) : null
@@ -271,6 +298,23 @@ export default function App() {
   const active = useActiveSection(NAV.map((n) => n.id))
   const [menu, setMenu] = useState(false)
   const [zoom, setZoom] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [showFab, setShowFab] = useState(false)
+  const rec = useMemo(() => totals(recSel()), [])
+
+  useEffect(() => {
+    const f = () => {
+      const h = document.documentElement
+      setProgress(h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight))
+      const sm = document.getElementById('summary')
+      const hero = document.getElementById('brief')
+      const y = window.scrollY
+      setShowFab(y > (hero ? hero.offsetTop : 600) && !(sm && sm.getBoundingClientRect().top < window.innerHeight * 0.6))
+    }
+    f()
+    window.addEventListener('scroll', f, { passive: true })
+    return () => window.removeEventListener('scroll', f)
+  }, [])
 
   const go = (id) => (e) => {
     e.preventDefault(); setMenu(false)
@@ -279,6 +323,7 @@ export default function App() {
 
   return (
     <>
+      <div className="progress" style={{ transform: `scaleX(${progress})` }} />
       <header className="topbar">
         <a href="#top" className="brand" onClick={go('top')} aria-label="Наверх">
           <span className="logo-pg"><img src="/img/progorod-logo.png" alt="ПроГород" /></span>
@@ -298,13 +343,10 @@ export default function App() {
             <div>
               <p className="eyebrow reveal">Персональное предложение · октябрь 2026</p>
               <h1 className="reveal">Вы строите <em>тёплые дома.</em> Мы приводим тех, кто их заказывает.</h1>
-              <p className="hero-lead reveal">
-                Мы изучили присутствие «Тёплого дома» в сети и собрали пять инструментов, которые ведут клиента
-                от первого знакомства до заявки: городское медиа, социальный проект, реклама, сайт и поиск/нейросети.
-              </p>
+              <p className="hero-lead reveal">Мы изучили присутствие «Тёплого дома» в сети и собрали пять инструментов, которые ведут клиента от первого знакомства до заявки.</p>
               <div className="hero-cta reveal">
-                <a href="#audit" className="btn" onClick={go('audit')}>Что мы увидели в вашем присутствии</a>
-                <a href="#summary" className="btn ghost-light" onClick={go('summary')}>Собрать свой пакет</a>
+                <a href="#brief" className="btn" onClick={go('brief')}>Смотреть предложение</a>
+                <button className="btn ghost-light" onClick={() => window.print()}>Сохранить в PDF</button>
               </div>
             </div>
             <div className="hero-badge reveal">
@@ -312,22 +354,39 @@ export default function App() {
               <div className="facts">{FACTS_TD.map((f) => <Stat key={f.label} {...f} />)}</div>
             </div>
           </div>
-
           <div className="wrap">
-            <div className="offers">
-              {OFFERS.map((o) => (
-                <a key={o.id} href={`#${o.id}`} className="offer reveal" onClick={go(o.id)}>
-                  <span className="offer-stage">{o.stage}</span>
-                  <span className="offer-n">{o.n}</span>
-                  <h3>{o.title}</h3>
-                  <p>{o.text}</p>
-                  <span className="offer-price">{o.price}<i>→</i></span>
-                </a>
-              ))}
-            </div>
             <div className="strip reveal">
               <p>Площадки «ПроГорода», на которых увидят ваш бренд</p>
               <div className="strip-stats">{PLATFORMS.map((p) => <Stat key={p.label} {...p} />)}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================== BRIEF */}
+        <section id="brief" className="sec white brief">
+          <div className="wrap">
+            <SectionHead n="Резюме" kicker="Главное за минуту" title={BRIEF.title} lead={BRIEF.lead} />
+            <div className="brief-grid">
+              <div className="brief-list">
+                {OFFERS.map((o) => (
+                  <a key={o.id} href={`#${o.id}`} className="brow reveal" onClick={go(o.id)}>
+                    <span className="bn">{o.n}</span>
+                    <div><small>{o.stage}</small><b>{o.title}</b><span>{o.text}</span></div>
+                    <em>{o.price}</em>
+                  </a>
+                ))}
+              </div>
+              <aside className="brief-rec reveal">
+                <p className="badge-s">Рекомендуемая связка</p>
+                <h3>Что вы получаете</h3>
+                <List items={BRIEF.deliver} />
+                <div className="rec-total">
+                  <span>Первые 3 месяца, ориентировочно</span>
+                  <b>≈ {rub(rec.total3)}</b>
+                  <small>разовые {rub(rec.once)} + {rub(rec.month)}/мес работы + реклама и внешний бюджет от {rub(rec.extra)}/мес</small>
+                </div>
+                <a href="#summary" className="btn" onClick={go('summary')}>Настроить под себя ↓</a>
+              </aside>
             </div>
           </div>
         </section>
@@ -336,12 +395,11 @@ export default function App() {
         <section id="audit" className="sec light">
           <div className="wrap">
             <SectionHead n="Аудит" kicker={`Проверка от ${AUDIT.date}`} title="Что мы увидели в вашем присутствии в сети" lead={AUDIT.lead} />
-
             <div className="audit-grid">
               <div className="audit-strong reveal">
                 <h4>Что уже сильно</h4>
-                <List items={AUDIT.strong} />
-                <p className="audit-note">Это сильная база: опыт, который можно превратить в страницы, кейсы и упоминания. Поэтому дорогая переделка сайта не нужна.</p>
+                <List items={AUDIT.strong.slice(0, 4)} />
+                <p className="audit-note">Это сильная база, поэтому дорогая переделка сайта не нужна.</p>
               </div>
               <div className="audit-gaps">
                 {AUDIT.gaps.map((g, i) => (
@@ -349,25 +407,24 @@ export default function App() {
                     <span className="gap-n">{i + 1}</span>
                     <div>
                       <h4>{g.t}</h4>
-                      <p className="see"><b>Видим:</b> {g.see}</p>
-                      <p className="fix"><b>Решаем:</b> {g.fix}</p>
+                      <p className="see">{g.see}</p>
+                      <p className="fix">→ {g.fix}</p>
                     </div>
                   </article>
                 ))}
               </div>
             </div>
-            <p className="sources reveal">Проверено по открытым источникам:{' '}
+            <p className="sources reveal">Источники:{' '}
               {AUDIT.sources.map(([t, u], i) => (<span key={u}><a href={u} target="_blank" rel="noreferrer">{t}</a>{i < AUDIT.sources.length - 1 ? ' · ' : ''}</span>))}
             </p>
 
-            <SubTitle>Как это работает вместе: путь клиента</SubTitle>
+            <SubTitle>Путь клиента</SubTitle>
             <div className="funnel">
               {FUNNEL.map((f, i) => (
                 <a key={f.stage} href={`#${f.go}`} className="fstep reveal" onClick={go(f.go)}>
                   <span className="fnum">{i + 1}</span>
                   <h4>{f.stage}</h4>
                   <small>{f.ids}</small>
-                  <p>{f.d}</p>
                 </a>
               ))}
             </div>
@@ -377,60 +434,22 @@ export default function App() {
         {/* =========================================================== 01 PODCAST */}
         <section id="podcast" className="sec dark">
           <div className="wrap">
-            <SectionHead dark n="01" stage="Узнают" kicker="Видеопроект · сезон 2026" title="Прогулка по Сыктывкару" lead={PODCAST.lead} />
+            <SectionHead dark n="01" stage="Узнают" kicker="Видеопроект · сезон 2026" title="Прогулка по Сыктывкару" lead="Ваш эксперт говорит о каркасных домах живым голосом на улицах города. Охват одного выпуска — 60–70 тысяч просмотров." />
 
-            <div className="grid-2">
-              <div className="card reveal">
-                <h4>Мощь городской медиаплатформы</h4>
-                <p>{PODCAST.scale}</p>
-                <div className="big-num">400 000+ <span>контактов, суммарный охват</span></div>
-              </div>
-              <div className="plat-grid reveal">
-                {PODCAST.platforms.map((p) => (<div key={p.name} className="plat"><small>{p.name}</small><b>{p.value}</b><span>{p.note}</span></div>))}
-              </div>
-            </div>
-
-            <SubTitle>Смотрите выпуски прямо здесь</SubTitle>
             <div className="reveal"><VideoPlayer /></div>
-            <p className="note reveal">{PODCAST.firstEpisode}. Население Сыктывкара ~245 тыс. человек: {PODCAST.forecast.split(': ')[1]}</p>
+            <p className="note reveal">{PODCAST.firstEpisode}. Население Сыктывкара ~245 тыс. человек, то есть выпуск может увидеть каждый третий горожанин.</p>
 
-            <WhyBox>Люди сомневаются, отдавая миллионы за дом. Выпуск, где ваш эксперт 30 минут отвечает на их вопросы, работает как личная консультация сразу для десятков тысяч зрителей.</WhyBox>
+            <WhyBox>Человек сомневается, отдавая миллионы за дом. Выпуск, где ваш эксперт 30 минут отвечает на его вопросы, работает как личная консультация сразу для десятков тысяч зрителей.</WhyBox>
 
             <div className="grid-2 gap-top">
               <div className="card reveal">
                 <h4>О чём мог бы быть ваш выпуск</h4>
-                <List items={PODCAST.topics} />
+                <List items={PODCAST.topics.slice(0, 4)} />
               </div>
-              <div className="card reveal">
-                <h4>Экспертный видеоподкаст на улицах города</h4>
-                <p>{PODCAST.format}</p>
-                <div className="vs-mini">
-                  <div><b>Обычная реклама</b>{PODCAST.before.map((t) => <span key={t}>– {t}</span>)}</div>
-                  <div className="good"><b>Прогулка по Сыктывкару</b>{PODCAST.after.map((t) => <span key={t}>+ {t}</span>)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid-2 gap-top">
               <div className="card host reveal">
-                <div className="avatar">НЧ</div>
-                <h4>{PODCAST.host.name}</h4>
-                <small>{PODCAST.host.role}</small>
+                <div className="host-top"><div className="avatar">НЧ</div><div><h4>{PODCAST.host.name}</h4><small>{PODCAST.host.role}</small></div></div>
                 <blockquote>«{PODCAST.host.quote}»</blockquote>
-                <div className="tags">{PODCAST.host.team.map((t) => <span key={t}>{t}</span>)}</div>
               </div>
-              <div className="card reveal">
-                <h4>Что вы получаете</h4>
-                <List items={PODCAST.included} />
-                <ul className="dist">
-                  {PODCAST.distribution.map((d) => <li key={d.name}><span>{d.name}</span><b>{d.value}</b></li>)}
-                </ul>
-              </div>
-            </div>
-
-            <SubTitle>Как проходит работа</SubTitle>
-            <div className="steps reveal">
-              {PODCAST.steps.map((s, i) => (<div key={s.t} className="step"><span>{String(i + 1).padStart(2, '0')}</span><h5>{s.t}</h5><p>{s.d}</p></div>))}
             </div>
 
             <SubTitle>Стоимость участия</SubTitle>
@@ -445,24 +464,22 @@ export default function App() {
                 </div>
               ))}
             </div>
-            <p className="note reveal">{PODCAST.note}</p>
+            <p className="note reveal">Слот бронируется заранее: не более 4 компаний в месяц.</p>
+
+            <More label="Как проходит работа и что входит">
+              <div className="steps">{PODCAST.steps.map((st, i) => (<div key={st.t} className="step"><span>{String(i + 1).padStart(2, '0')}</span><h5>{st.t}</h5><p>{st.d}</p></div>))}</div>
+              <div className="card gap-top"><h4>Что вы получаете</h4><List items={PODCAST.included} /></div>
+              <p className="note">{PODCAST.note}</p>
+            </More>
           </div>
         </section>
 
         {/* =========================================================== 02 TEACHER */}
         <section id="teacher" className="sec light">
           <div className="wrap">
-            <SectionHead n="02" stage="Запоминают" kicker={`Партнёрский проект · ${TEACHER.period}`} title="Народный учитель" lead={TEACHER.intro} />
+            <SectionHead n="02" stage="Запоминают" kicker={`Партнёрский проект · ${TEACHER.period}`} title="Народный учитель" lead="Городской социальный проект: жители выбирают любимого школьного учителя, а партнёры вручают награды на итоговом мероприятии." />
 
             <WhyBox>Строительство дома — решение семьи, а семьи с детьми — ваша ключевая аудитория. Партнёрство в проекте, который чествует школьных учителей, ставит бренд рядом с добрым делом, а не рядом с рекламой.</WhyBox>
-
-            <div className="grid-2 gap-top">
-              <div className="card reveal"><h4>Информационная поддержка</h4>
-                <ul className="support">{TEACHER.support.map((s) => <li key={s.name}><b>{s.name}</b><span>{s.note}</span></li>)}</ul>
-              </div>
-              <div className="card reveal"><h4>Цели проекта</h4><List items={TEACHER.goals} /></div>
-            </div>
-            <div className="card wide reveal"><h4>Как проходит проект</h4><p>{TEACHER.mechanics}</p></div>
 
             <SubTitle>Четыре варианта сотрудничества</SubTitle>
             <div className="tiers">
@@ -473,70 +490,53 @@ export default function App() {
                     <div className="price">{t.price}<small>за 3 месяца</small></div>
                     <p className="monthly">или {t.monthly} при поэтапной оплате</p>
                   </div>
-                  <div className="tier-body"><p className="tag">{t.tag}</p><List items={t.items} /></div>
+                  <div className="tier-body"><p className="tag">{t.tag}</p><TrimList items={t.items} max={4} /></div>
                 </article>
               ))}
             </div>
-
-            <div className="pre reveal">
-              <h4>Возможности для партнёров перед концертом</h4>
-              <div className="pre-grid">{TEACHER.preConcert.map((p) => <div key={p.t}><b>{p.t}</b><span>{p.d}</span></div>)}</div>
-            </div>
             <ul className="terms reveal">{TEACHER.terms.map((t) => <li key={t}>{t}</li>)}</ul>
 
-            <SubTitle>Так выглядит предложение для партнёров</SubTitle>
-            <div className="mockups reveal">
-              <button onClick={() => setZoom('/img/narodny-uchitel-opisanie.jpg')}>
-                <img src="/img/narodny-uchitel-opisanie.jpg" alt="Описание проекта «Народный учитель»" loading="lazy" /><span>Описание проекта — нажмите, чтобы увеличить</span>
-              </button>
-              <button onClick={() => setZoom('/img/narodny-uchitel-pakety.png')}>
-                <img src="/img/narodny-uchitel-pakety.png" alt="Пакеты партнёрства" loading="lazy" /><span>Пакеты партнёрства — нажмите, чтобы увеличить</span>
-              </button>
-            </div>
-
-            <SubTitle>{TEACHER.previous.title}</SubTitle>
+            <SubTitle>Пример: «Народный тренер 2026»</SubTitle>
             <div className="grid-2 prev">
               <div className="reveal"><SitePreview url={TEACHER.previous.url} title="Народный тренер 2026" ratio={0.8} hint="Страница проекта" /></div>
               <div className="card reveal">
                 <h4>Так выглядит партнёрство на странице проекта</h4>
-                <p>{TEACHER.previous.text}</p>
-                <ul className="plain">{TEACHER.previous.partners.map((p) => <li key={p}>{p}</li>)}</ul>
+                <p>Партнёры представлены логотипами со ссылками на их ресурсы, истории участников выходят на сайте и во всех соцсетях «ПроГорода».</p>
+                <ul className="plain">{TEACHER.previous.partners.map((x) => <li key={x}>{x}</li>)}</ul>
                 <a className="btn ghost" href={TEACHER.previous.url} target="_blank" rel="noreferrer">Открыть страницу проекта ↗</a>
               </div>
             </div>
+
+            <More label="Цели, механика проекта и макеты предложения">
+              <div className="grid-2">
+                <div className="card"><h4>Цели проекта</h4><List items={TEACHER.goals} /></div>
+                <div className="card"><h4>Как проходит проект</h4><p>{TEACHER.mechanics}</p></div>
+              </div>
+              <div className="pre">
+                <h4>Возможности для партнёров перед концертом</h4>
+                <div className="pre-grid">{TEACHER.preConcert.map((x) => <div key={x.t}><b>{x.t}</b><span>{x.d}</span></div>)}</div>
+              </div>
+              <div className="mockups gap-top">
+                <button onClick={() => setZoom('/img/narodny-uchitel-opisanie.jpg')}><img src="/img/narodny-uchitel-opisanie.jpg" alt="Описание проекта" loading="lazy" /><span>Описание проекта — нажмите, чтобы увеличить</span></button>
+                <button onClick={() => setZoom('/img/narodny-uchitel-pakety.png')}><img src="/img/narodny-uchitel-pakety.png" alt="Пакеты партнёрства" loading="lazy" /><span>Пакеты партнёрства — нажмите, чтобы увеличить</span></button>
+              </div>
+            </More>
           </div>
         </section>
 
         {/* =========================================================== 03 CONTEXT */}
         <section id="context" className="sec white">
           <div className="wrap">
-            <SectionHead n="03" stage="Находят" kicker="Яндекс.Директ · Поиск + РСЯ" title="Контекстная реклама" lead={CONTEXT.lead} />
-            <div className="stats4 reveal">{CONTEXT.stats.map((s) => <Stat key={s.label} {...s} />)}</div>
+            <SectionHead n="03" stage="Находят" kicker="Яндекс.Директ · Поиск + РСЯ" title="Контекстная реклама" lead="Показываем рекламу тем, кто уже ищет каркасный дом, и возвращаем тех, кто посмотрел ваш сайт и ушёл." />
+            <div className="stats4 reveal">{CONTEXT.stats.map((x) => <Stat key={x.label} {...x} />)}</div>
 
-            <WhyBox>Человек, который вводит «каркасный дом под ключ Сыктывкар», уже выбирает подрядчика. Поиск перехватывает такой спрос, а РСЯ возвращает тех, кто посмотрел ваш сайт и ушёл — для дорогой стройки это обычная история.</WhyBox>
-
-            <SubTitle>Почему обычная реклама не работает</SubTitle>
-            <div className="cards3">
-              {CONTEXT.problems.map((p) => (<div key={p.t} className="card reveal"><h4>{p.t}</h4><p>{p.d}</p></div>))}
-            </div>
+            <WhyBox>Человек, который вводит «каркасный дом под ключ Сыктывкар», уже выбирает подрядчика. Поиск перехватывает такой спрос, а РСЯ возвращает тех, кто ушёл с сайта без заявки — для дорогой стройки это обычное дело.</WhyBox>
 
             <div className="grid-2 gap-top">
-              <div className="card reveal"><h4>{CONTEXT.rsyaTitle}</h4><p>{CONTEXT.rsya}</p><List items={CONTEXT.how} /></div>
-              <div className="card accent reveal"><h4>Честно о рекламе</h4><p>{CONTEXT.honest}</p></div>
-            </div>
-
-            <SubTitle>Поиск + РСЯ: комплексный подход</SubTitle>
-            <div className="grid-2">
               {CONTEXT.channels.map((c) => (
-                <div key={c.t} className="card reveal"><span className="chip">{c.tag}</span><h4>{c.t}</h4><p>{c.d}</p><List items={c.list} /></div>
+                <div key={c.t} className="card reveal"><span className="chip">{c.tag}</span><h4>{c.t}</h4><p>{c.d}</p></div>
               ))}
             </div>
-            <div className="cards3 gap-top">
-              {CONTEXT.synergy.map((p) => (<div key={p.t} className="card soft reveal"><h4>{p.t}</h4><p>{p.d}</p></div>))}
-            </div>
-
-            <SubTitle>Что входит в стоимость</SubTitle>
-            <div className="cards3">{CONTEXT.included.map(([t, d]) => (<div key={t} className="card reveal"><h4>{t}</h4><p>{d}</p></div>))}</div>
 
             <SubTitle>Тарифы</SubTitle>
             <div className="tariffs three reveal">
@@ -546,54 +546,44 @@ export default function App() {
                   <h4>{t.name}</h4><p className="sub">{t.sub}</p>
                   <div className="price">{t.price}</div>
                   {t.save && <p className="save">{t.save}</p>}
-                  <List items={t.items} />
+                  <TrimList items={t.items} max={4} />
                 </div>
               ))}
             </div>
-            <p className="note reveal">{CONTEXT.budgetNote}</p>
+            <p className="note reveal">{CONTEXT.budgetNote} {CONTEXT.honest}</p>
 
-            <SubTitle>Фрилансер или ПроГород?</SubTitle>
-            <div className="table-wrap reveal">
-              <table className="compare">
-                <thead><tr><th></th><th>Фрилансер</th><th>ПроГород</th></tr></thead>
-                <tbody>{CONTEXT.compare.map(([a, b, c]) => (<tr key={a}><td>{a}</td><td>{b}</td><td>{c}</td></tr>))}</tbody>
-              </table>
-            </div>
-
-            <SubTitle>Наши гарантии</SubTitle>
-            <div className="cards4">{CONTEXT.guarantees.map(([t, d]) => (<div key={t} className="card soft reveal"><h4>{t}</h4><p>{d}</p></div>))}</div>
-
-            <SubTitle>Почему выбирают «ПроГород»</SubTitle>
-            <div className="cards3">{CONTEXT.why.map(([t, d], i) => (<div key={t} className="card reveal"><span className="num">{i + 1}</span><h4>{t}</h4><p>{d}</p></div>))}</div>
-
-            <SubTitle>Частые вопросы</SubTitle>
-            <Faq items={CONTEXT.faq} />
+            <More label="Что входит, сравнение с фрилансером, вопросы">
+              <div className="cards3">{CONTEXT.included.map(([t, d]) => (<div key={t} className="card"><h4>{t}</h4><p>{d}</p></div>))}</div>
+              <h3 className="subtitle">Фрилансер или ПроГород?</h3>
+              <div className="table-wrap">
+                <table className="compare">
+                  <thead><tr><th></th><th>Фрилансер</th><th>ПроГород</th></tr></thead>
+                  <tbody>{CONTEXT.compare.map(([x, y, z]) => (<tr key={x}><td>{x}</td><td>{y}</td><td>{z}</td></tr>))}</tbody>
+                </table>
+              </div>
+              <h3 className="subtitle">Частые вопросы</h3>
+              <Faq items={CONTEXT.faq} />
+            </More>
           </div>
         </section>
 
         {/* =========================================================== 04 SITES */}
         <section id="sites" className="sec light">
           <div className="wrap">
-            <SectionHead n="04" stage="Доверяют" kicker="15 лет на рынке Сыктывкара" title="Каталог проектов и посадочные на сайте" lead={SITES.lead} />
-            <div className="stats4 reveal">{SITES.stats.map((s) => <Stat key={s.label} {...s} />)}</div>
+            <SectionHead n="04" stage="Доверяют" kicker="15 лет на рынке Сыктывкара" title="Каталог проектов и посадочные на сайте" lead="Превращаем сайт из визитки в инструмент продаж: проекты с фильтрами, цены, форма расчёта." />
+            <div className="stats4 reveal">{SITES.stats.map((x) => <Stat key={x.label} {...x} />)}</div>
 
-            <WhyBox>Полностью переделывать ваш сайт не нужно. Но 16+ построенных домов лежат без каталога, а реклама и поиск должны вести на конкретные страницы. Мы предлагаем раздел «Проекты» с фильтрами по площади и цене и посадочные под ключевые запросы. Формат и стоимость такой доработки рассчитаем отдельно, а ниже — пакеты для новых сайтов.</WhyBox>
+            <WhyBox>Полностью переделывать ваш сайт не нужно. Но 16+ построенных домов лежат без каталога, а реклама и поиск должны вести на конкретные страницы. Предлагаем раздел «Проекты» с фильтрами по площади и цене и посадочные под ключевые запросы. Стоимость такой доработки рассчитаем отдельно, а ниже — пакеты для новых сайтов.</WhyBox>
 
-            <SubTitle>Наши работы — живые сайты</SubTitle>
+            <SubTitle>Наши работы</SubTitle>
             <div className="portfolio">
-              {SITES.portfolio.map((p) => (
-                <div key={p.url} className="reveal">
-                  <SitePreview url={p.url} title={p.title} shot={p.shot} />
-                  <div className="p-cap"><b>{p.title}</b><span>{p.desc}</span></div>
+              {SITES.portfolio.map((x) => (
+                <div key={x.url} className="reveal">
+                  <SitePreview url={x.url} title={x.title} shot={x.shot} />
+                  <div className="p-cap"><b>{x.title}</b><span>{x.desc}</span></div>
                 </div>
               ))}
             </div>
-
-            <SubTitle>Почему выбирают нас</SubTitle>
-            <div className="cards4">{SITES.advantages.map(([t, d]) => (<div key={t} className="card reveal"><h4>{t}</h4><p>{d}</p></div>))}</div>
-
-            <SubTitle>Этапы работы</SubTitle>
-            <div className="timeline reveal">{SITES.stages.map(([t, d], i) => (<div key={t}><span>{i + 1}</span><h5>{t}</h5><p>{d}</p></div>))}</div>
 
             <SubTitle>Пакеты услуг</SubTitle>
             <div className="tariffs four reveal">
@@ -602,39 +592,34 @@ export default function App() {
                   {t.badge && <span className="badge">{t.badge}</span>}
                   <h4>{t.name}</h4><p className="sub">{t.sub}</p>
                   <div className="price">{t.price}</div>
-                  <List items={t.items} />
+                  <TrimList items={t.items} max={4} />
                 </div>
               ))}
             </div>
+            <p className="note reveal">Гарантия 1 год, работа по договору, 2 раунда бесплатных правок на каждом этапе. При заказе от 40 000 ₽ — 1 месяц контекстной рекламы в подарок.</p>
 
-            <SubTitle>Мы отвечаем за качество</SubTitle>
-            <div className="cards3">{SITES.guarantees.map(([t, d]) => (<div key={t} className="card reveal"><h4>{t}</h4><p>{d}</p></div>))}</div>
-
-            <SubTitle>Бонусы при заказе</SubTitle>
-            <div className="cards4">{SITES.bonuses.map(([t, d]) => (<div key={t} className="card soft reveal"><h4>{t}</h4><p>{d}</p></div>))}</div>
-
-            <SubTitle>Частые вопросы</SubTitle>
-            <Faq items={SITES.faq} />
+            <More label="Этапы работы, гарантии, вопросы">
+              <div className="timeline">{SITES.stages.map(([t, d], i) => (<div key={t}><span>{i + 1}</span><h5>{t}</h5><p>{d}</p></div>))}</div>
+              <div className="cards3 gap-top">{SITES.guarantees.map(([t, d]) => (<div key={t} className="card"><h4>{t}</h4><p>{d}</p></div>))}</div>
+              <h3 className="subtitle">Частые вопросы</h3>
+              <Faq items={SITES.faq} />
+            </More>
           </div>
         </section>
 
         {/* =========================================================== 05 SEO */}
         <section id="seo" className="sec dark">
           <div className="wrap">
-            <SectionHead dark n="05" stage="Выбирают вас" kicker="SEO · GEO/AI · SERM · аудит от 28.10.2026" title="Чтобы вас находили, называли и хвалили" lead={SEO.lead} />
+            <SectionHead dark n="05" stage="Выбирают вас" kicker="SEO · GEO/AI · SERM" title="Чтобы вас находили, называли и хвалили" lead="Накопительный канал: страницы и упоминания, которые приводят клиентов месяцами после публикации." />
 
             <div className="grid-2">
               <div className="card reveal">
-                <h4>Какие страницы создаём (приоритетный пул)</h4>
-                <ul className="chips">{SEO.clusters.map((c) => <li key={c}>{c}</li>)}</ul>
-                <p className="muted-s">Не всё сразу: при бюджете от 20 000 ₽ в месяц берём 1–2 коммерческих кластера в месяц.</p>
+                <h4>Какие страницы создаём</h4>
+                <ul className="chips">{SEO.clusters.slice(0, 6).map((c) => <li key={c}>{c}</li>)}</ul>
+                <p className="muted-s">Не всё сразу: при бюджете от 20 000 ₽ в месяц берём 1–2 кластера в месяц.</p>
               </div>
-              <div className="card reveal">
-                <h4>Темы экспертных материалов</h4>
-                <List items={SEO.topics} />
-              </div>
+              <div className="card accent2 reveal"><h4>Что такое GEO/AI</h4><p>{SEO.ai}</p></div>
             </div>
-            <div className="card accent2 wide reveal"><h4>Что такое GEO/AI</h4><p>{SEO.ai}</p></div>
 
             <SubTitle>Три варианта работы</SubTitle>
             <div className="tariffs three reveal">
@@ -644,33 +629,32 @@ export default function App() {
                   <h4>{t.name}</h4><p className="sub">{t.sub}</p>
                   <div className="price">{t.price}</div>
                   <p className="ext">{t.ext}</p>
-                  <List items={t.items} />
-                  {t.no && <p className="no">{t.no}</p>}
+                  <TrimList items={t.items} max={4} />
                 </div>
               ))}
             </div>
-            <p className="note reveal">Для вашей ниши мы советуем «SEO + GEO/AI»: SEO создаёт страницы, которые получают трафик, а GEO усиливает их внешними источниками и присутствием бренда вне собственного сайта.</p>
-
-            <SubTitle>План первых трёх месяцев</SubTitle>
-            <div className="table-wrap reveal">
-              <table className="compare road">
-                <thead><tr><th></th><th>SEO</th><th>GEO/AI</th><th>SERM / карты</th></tr></thead>
-                <tbody>{SEO.roadmap.map((r) => (<tr key={r.m}><td>{r.m}</td><td>{r.seo}</td><td>{r.geo}</td><td>{r.serm}</td></tr>))}</tbody>
-              </table>
-            </div>
+            <p className="note reveal">Для вашей ниши советуем «SEO + GEO/AI»: SEO создаёт страницы, которые получают трафик, а GEO усиливает их внешними источниками.</p>
 
             <SubTitle>Честные сроки</SubTitle>
-            <div className="honest reveal">
-              {SEO.honest.map(([t, d]) => (<div key={t}><b>{t}</b><span>{d}</span></div>))}
-            </div>
+            <div className="honest reveal">{SEO.honest.map(([t, d]) => (<div key={t}><b>{t}</b><span>{d}</span></div>))}</div>
             <p className="note reveal">{SEO.honestNote}</p>
+
+            <More label="План первых трёх месяцев и темы материалов">
+              <div className="table-wrap">
+                <table className="compare road">
+                  <thead><tr><th></th><th>SEO</th><th>GEO/AI</th><th>SERM / карты</th></tr></thead>
+                  <tbody>{SEO.roadmap.map((r) => (<tr key={r.m}><td>{r.m}</td><td>{r.seo}</td><td>{r.geo}</td><td>{r.serm}</td></tr>))}</tbody>
+                </table>
+              </div>
+              <div className="card gap-top"><h4>Темы экспертных материалов</h4><List items={SEO.topics} /></div>
+            </More>
           </div>
         </section>
 
         {/* =========================================================== SUMMARY */}
         <section id="summary" className="sec white">
           <div className="wrap">
-            <SectionHead n="Итого" kicker="Интерактивный расчёт" title="Соберите пакет под задачу «Тёплого дома»" lead="Выберите нужные услуги — сумма и срок окупаемости пересчитаются сразу. Мы заранее отметили набор, который считаем самым сбалансированным." />
+            <SectionHead n="Пакет" kicker="Интерактивный расчёт" title="Соберите пакет под задачу «Тёплого дома»" lead="Выберите услуги — сумма и окупаемость пересчитаются сразу. Рекомендуемый набор уже отмечен." />
             <div className="reveal"><Calculator /></div>
           </div>
         </section>
@@ -680,8 +664,11 @@ export default function App() {
         <div className="wrap foot-in">
           <span className="logo-pg"><img src="/img/progorod-logo.png" alt="ПроГород" /></span>
           <p>Персональное предложение для компании «Тёплый дом» · октябрь 2026. Цены действительны на дату обращения.</p>
+          <button className="btn small ghost-light" onClick={() => window.print()}>Сохранить в PDF</button>
         </div>
       </footer>
+
+      <a href="#summary" className={`fab ${showFab ? 'on' : ''}`} onClick={go('summary')}>Собрать пакет ↓</a>
       <Lightbox src={zoom} onClose={() => setZoom(null)} />
     </>
   )
