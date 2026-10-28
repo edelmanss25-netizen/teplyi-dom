@@ -449,3 +449,8 @@ blockquote { font-family: var(--head); font-weight: 600; font-size: 17px; line-h
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .faq-a { grid-template-rows: 1fr !important; } .faq-a p { padding-bottom: 14px !important; }
 }
+
+.brow { grid-template-columns: 48px 1fr; }
+.rec-note { margin: 18px 0 20px; font-size: 13.5px; color: #cfcabc; }
+.brief-rec .btn { width: 100%; text-align: center; }
+@media (max-width: 620px) { .brow { grid-template-columns: 40px 1fr; } }

@@ -300,7 +300,6 @@ export default function App() {
   const [zoom, setZoom] = useState(null)
   const [progress, setProgress] = useState(0)
   const [showFab, setShowFab] = useState(false)
-  const rec = useMemo(() => totals(recSel()), [])
 
   useEffect(() => {
     const f = () => {
@@ -365,27 +364,22 @@ export default function App() {
         {/* =========================================================== BRIEF */}
         <section id="brief" className="sec white brief">
           <div className="wrap">
-            <SectionHead n="Резюме" kicker="Главное за минуту" title={BRIEF.title} lead={BRIEF.lead} />
+            <SectionHead n="Суть" kicker="Коротко о предложении" title={BRIEF.title} lead={BRIEF.lead} />
             <div className="brief-grid">
               <div className="brief-list">
                 {OFFERS.map((o) => (
                   <a key={o.id} href={`#${o.id}`} className="brow reveal" onClick={go(o.id)}>
                     <span className="bn">{o.n}</span>
                     <div><small>{o.stage}</small><b>{o.title}</b><span>{o.text}</span></div>
-                    <em>{o.price}</em>
                   </a>
                 ))}
               </div>
               <aside className="brief-rec reveal">
-                <p className="badge-s">Рекомендуемая связка</p>
-                <h3>Что вы получаете</h3>
+                <p className="badge-s">Пример связки</p>
+                <h3>Что будет сделано</h3>
                 <List items={BRIEF.deliver} />
-                <div className="rec-total">
-                  <span>Первые 3 месяца, ориентировочно</span>
-                  <b>≈ {rub(rec.total3)}</b>
-                  <small>разовые {rub(rec.once)} + {rub(rec.month)}/мес работы + реклама и внешний бюджет от {rub(rec.extra)}/мес</small>
-                </div>
-                <a href="#summary" className="btn" onClick={go('summary')}>Настроить под себя ↓</a>
+                <p className="rec-note">Это рекомендуемый набор. Любую часть можно убрать или заменить.</p>
+                <a href="#summary" className="btn" onClick={go('summary')}>Посмотреть стоимость и собрать пакет ↓</a>
               </aside>
             </div>
           </div>
